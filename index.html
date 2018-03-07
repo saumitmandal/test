@@ -1,1 +1,126 @@
-<h1>Hello World!</h1>
+
+<!doctype>
+<html>
+<head>
+    <title>MediaRecorder to RTMP Demo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
+</head>
+<body style="max-width:800px;height:100%;margin:auto;">
+<h1>
+    MediaRecorder to RTMP Demo
+</h1>
+<label for="option_width" >Size:</label>
+<input type="text" id="option_width" value="480"/> &times;
+<input type="text" id="option_height" value="360"/>
+<br>
+<button id="button_start">Start streaming</button>
+<hr/>
+<div>
+    <p id="output_message"></p>
+    <video id="output_video" autoplay=true></video>
+</div>
+<hr/>
+<textarea readonly="true" id="output_console" cols=91 rows=5>
+</textarea>
+
+<script>
+    function fail(str){alert(str+"\nPlease download the latest version of Firefox!");location.replace('http://mozilla.org/firefox');}
+    var output_console=document.getElementById('output_console'),
+            output_message=document.getElementById('output_message'),
+            output_video=document.getElementById('output_video'),
+            option_width=document.getElementById('option_width'),
+            option_height=document.getElementById('option_height'),
+            button_start=document.getElementById('button_start'),
+            height=option_height.value,
+            width=option_width.value
+
+    option_height.onchange=option_height.onkeyup=function(){height=1*this.value;}
+    option_width.onchange=option_width.onkeyup=function(){width=1*this.value;}
+    button_start.onclick=requestMedia;
+
+    function video_show(stream){
+        if (window.URL) {
+            output_video.src = window.URL.createObjectURL(stream);
+        } else {
+            output_video.src = stream;
+        }
+        output_video.addEventListener( "loadedmetadata", function (e) {
+            output_message.innerHTML="Local video source size:"+output_video.videoWidth+"x"+output_video.videoHeight;
+        }, false );
+    }
+    function show_output(str){
+        output_console.value+="\n"+str;
+        output_console.scrollTop = output_console.scrollHeight;
+    }
+
+
+    navigator.getUserMedia = (navigator.getUserMedia ||
+    navigator.mozGetUserMedia ||
+    navigator.msGetUserMedia ||
+    navigator.webkitGetUserMedia);
+    if(!navigator.getUserMedia){fail('No getUserMedia() available.');}
+    if(!MediaRecorder){fail('No MediaRecorder available.');}
+    var mediaRecorder;
+    //var socket = io('https://172.26.95.105:8000');
+    //var socket = io('http://localhost:3003');
+    //var socket = io('https://localhost:8000');
+    var socket = io('https://35.171.45.30:8000');
+    //var socket = io('http://localhost:3002');
+    //socket.connect('http://72.26.90.141:3002');
+    socket.on('connection',function(m){
+        console.log('connected to the server');
+    });
+    socket.on('message',function(m){
+        console.log('recv server message',m);
+        show_output('SERVER:'+m);
+    });
+    socket.on('fatal',function(m){
+        show_output('ERROR: unexpected:'+m);
+        alert('Error:'+m);
+        mediaRecorder.stop();
+//should reload?
+    });
+    socket.on('ffmpeg_stderr',function(m){
+        console.log('data ------'+m);
+        show_output('FFMPEG:'+m);
+    });
+    socket.on('disconnect', function () {
+        show_output('ERROR: server disconnected!');
+        mediaRecorder.stop();
+    });
+    function onSuccess(stream) {
+        video_show(stream);//only show locally, not remotely
+        socket.emit('start','start');
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.start(2000);
+
+        mediaRecorder.onstop = function(e) {
+            stream.stop();
+        }
+
+        mediaRecorder.ondataavailable = function(e) {
+            socket.emit("binarystream",e.data);
+//chunks.push(e.data);
+        }
+
+    }
+
+
+    function onError(err) {
+        console.log('The following error occured: ' + err);
+        show_output('Local getUserMedia ERROR:'+err);
+    }
+    function requestMedia(){
+        var constraints = { audio: true,
+            video:{
+                width: width,
+                height: height,
+            }
+        };
+//var getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+
+        navigator.getUserMedia(constraints, onSuccess, onError);
+    }
+</script>
+</body>
+</html>
