@@ -83,7 +83,7 @@
     });
     socket.on('ffmpeg_stderr',function(m){
         console.log('data ------'+m);
-        show_output('FFMPEG:'+m);
+        //show_output('FFMPEG:'+m);
     });
     socket.on('disconnect', function () {
         show_output('ERROR: server disconnected!');
